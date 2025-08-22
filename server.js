@@ -10,7 +10,7 @@ const app = express();
 // -------------------- Middlewares --------------------
 app.use(helmet());
 app.use(express.json());
-app.use(cors({ origin: "*" })); // en producción puedes cambiar "*" por tu frontend
+app.use(cors({ origin: "*" }));
 app.use(morgan("dev"));
 
 // -------------------- MongoDB --------------------
@@ -91,12 +91,34 @@ app.post("/ritmo", async (req, res) => {
   }
 });
 
-// Obtener últimas lecturas
+// Obtener últimas lecturas por conductor
 app.get("/ritmo/:conductorId/latest", async (req, res) => {
   try {
     const doc = await Ritmo.findOne({ conductorId: req.params.conductorId }).sort({ createdAt: -1 });
     if (!doc) return res.status(404).json({ error: "Sin lecturas" });
     res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- NUEVOS ENDPOINTS --------------------
+
+// Obtener todos los conductores
+app.get("/conductor/all", async (req, res) => {
+  try {
+    const conductores = await Conductor.find().sort({ createdAt: -1 });
+    res.json({ total: conductores.length, data: conductores });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Obtener todos los ritmos cardiacos
+app.get("/ritmo/all", async (req, res) => {
+  try {
+    const lecturas = await Ritmo.find().sort({ createdAt: -1 });
+    res.json({ total: lecturas.length, data: lecturas });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
