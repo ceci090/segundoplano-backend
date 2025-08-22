@@ -123,6 +123,20 @@ app.get("/ritmo/all", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// -------------------- BORRAR TODOS LOS CONDUCTORES Y RITMOS (Solo pruebas) --------------------
+app.delete("/conductor/all", async (req, res) => {
+  try {
+    const borradoConductores = await Conductor.deleteMany({});
+    const borradoRitmos = await Ritmo.deleteMany({});
+    res.json({
+      message: "Todos los conductores y ritmos han sido borrados",
+      conductoresBorrados: borradoConductores.deletedCount,
+      ritmosBorrados: borradoRitmos.deletedCount
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // -------------------- Arranque --------------------
 const PORT = process.env.PORT || 3000;
