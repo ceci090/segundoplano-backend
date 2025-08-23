@@ -49,6 +49,28 @@ const ritmoSchema = new mongoose.Schema(
 );
 const Ritmo = mongoose.model("Ritmo", ritmoSchema);
 
+// Brújula
+const brujulaSchema = new mongoose.Schema(
+  {
+    conductorId: { type: String, required: true, index: true },
+    compass: { type: String, required: true },
+    fecha: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+const Brujula = mongoose.model("Brujula", brujulaSchema);
+
+// Ubicación
+const ubicacionSchema = new mongoose.Schema(
+  {
+    conductorId: { type: String, required: true, index: true },
+    location: { type: String, required: true }, // "lat, lon"
+    fecha: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+const Ubicacion = mongoose.model("Ubicacion", ubicacionSchema);
+
 // -------------------- Rutas --------------------
 
 // Salud del servidor
@@ -76,7 +98,9 @@ app.post("/conductor", async (req, res) => {
   }
 });
 
-// Registrar ritmo cardiaco
+// -------------------- Registro de lecturas --------------------
+
+// Ritmo cardiaco
 app.post("/ritmo", async (req, res) => {
   try {
     const { conductorId, bpm } = req.body;
@@ -91,20 +115,74 @@ app.post("/ritmo", async (req, res) => {
   }
 });
 
-// Obtener últimas lecturas por conductor
+// Brújula
+app.post("/brujula", async (req, res) => {
+  try {
+    const { conductorId, compass } = req.body;
+    if (!conductorId || !compass)
+      return res.status(400).json({ error: "conductorId y compass son requeridos" });
+
+    const lectura = new Brujula({ conductorId, compass });
+    await lectura.save();
+    res.status(201).json({ message: "Brújula guardada", data: lectura });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ubicación
+app.post("/ubicacion", async (req, res) => {
+  try {
+    const { conductorId, location } = req.body;
+    if (!conductorId || !location)
+      return res.status(400).json({ error: "conductorId y location son requeridos" });
+
+    const lectura = new Ubicacion({ conductorId, location });
+    await lectura.save();
+    res.status(201).json({ message: "Ubicación guardada", data: lectura });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- Consultas por conductor --------------------
+
+// Última lectura de ritmo
 app.get("/ritmo/:conductorId/latest", async (req, res) => {
   try {
     const doc = await Ritmo.findOne({ conductorId: req.params.conductorId }).sort({ createdAt: -1 });
-    if (!doc) return res.status(404).json({ error: "Sin lecturas" });
+    if (!doc) return res.status(404).json({ error: "Sin lecturas de ritmo" });
     res.json(doc);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// -------------------- NUEVOS ENDPOINTS --------------------
+// Última lectura de brújula
+app.get("/brujula/:conductorId/latest", async (req, res) => {
+  try {
+    const doc = await Brujula.findOne({ conductorId: req.params.conductorId }).sort({ createdAt: -1 });
+    if (!doc) return res.status(404).json({ error: "Sin lecturas de brújula" });
+    res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-// Obtener todos los conductores
+// Última lectura de ubicación
+app.get("/ubicacion/:conductorId/latest", async (req, res) => {
+  try {
+    const doc = await Ubicacion.findOne({ conductorId: req.params.conductorId }).sort({ createdAt: -1 });
+    if (!doc) return res.status(404).json({ error: "Sin lecturas de ubicación" });
+    res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- Consultas generales --------------------
+
+// Todos los conductores
 app.get("/conductor/all", async (req, res) => {
   try {
     const conductores = await Conductor.find().sort({ createdAt: -1 });
@@ -114,7 +192,7 @@ app.get("/conductor/all", async (req, res) => {
   }
 });
 
-// Obtener todos los ritmos cardiacos
+// Todas las lecturas de ritmo
 app.get("/ritmo/all", async (req, res) => {
   try {
     const lecturas = await Ritmo.find().sort({ createdAt: -1 });
@@ -123,15 +201,40 @@ app.get("/ritmo/all", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// -------------------- BORRAR TODOS LOS CONDUCTORES Y RITMOS (Solo pruebas) --------------------
+
+// Todas las lecturas de brújula
+app.get("/brujula/all", async (req, res) => {
+  try {
+    const lecturas = await Brujula.find().sort({ createdAt: -1 });
+    res.json({ total: lecturas.length, data: lecturas });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Todas las lecturas de ubicación
+app.get("/ubicacion/all", async (req, res) => {
+  try {
+    const lecturas = await Ubicacion.find().sort({ createdAt: -1 });
+    res.json({ total: lecturas.length, data: lecturas });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- BORRAR TODOS LOS CONDUCTORES Y LECTURAS (solo pruebas) --------------------
 app.delete("/conductor/all", async (req, res) => {
   try {
     const borradoConductores = await Conductor.deleteMany({});
     const borradoRitmos = await Ritmo.deleteMany({});
+    const borradoBrujula = await Brujula.deleteMany({});
+    const borradoUbicacion = await Ubicacion.deleteMany({});
     res.json({
-      message: "Todos los conductores y ritmos han sido borrados",
+      message: "Todos los conductores y lecturas han sido borrados",
       conductoresBorrados: borradoConductores.deletedCount,
-      ritmosBorrados: borradoRitmos.deletedCount
+      ritmosBorrados: borradoRitmos.deletedCount,
+      brujulaBorrados: borradoBrujula.deletedCount,
+      ubicacionBorrados: borradoUbicacion.deletedCount
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
