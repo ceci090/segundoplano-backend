@@ -53,7 +53,7 @@ const Ritmo = mongoose.model("Ritmo", ritmoSchema);
 const brujulaSchema = new mongoose.Schema(
   {
     conductorId: { type: String, required: true, index: true },
-    compass: { type: String, required: true },
+    compass: { type: Number, required: true }, // Número en grados
     fecha: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -64,7 +64,8 @@ const Brujula = mongoose.model("Brujula", brujulaSchema);
 const ubicacionSchema = new mongoose.Schema(
   {
     conductorId: { type: String, required: true, index: true },
-    location: { type: String, required: true }, // "lat, lon"
+    latitud: { type: Number, required: true },
+    longitud: { type: Number, required: true },
     fecha: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -119,7 +120,7 @@ app.post("/ritmo", async (req, res) => {
 app.post("/brujula", async (req, res) => {
   try {
     const { conductorId, compass } = req.body;
-    if (!conductorId || !compass)
+    if (!conductorId || typeof compass !== "number")
       return res.status(400).json({ error: "conductorId y compass son requeridos" });
 
     const lectura = new Brujula({ conductorId, compass });
@@ -133,11 +134,11 @@ app.post("/brujula", async (req, res) => {
 // Ubicación
 app.post("/ubicacion", async (req, res) => {
   try {
-    const { conductorId, location } = req.body;
-    if (!conductorId || !location)
-      return res.status(400).json({ error: "conductorId y location son requeridos" });
+    const { conductorId, latitud, longitud } = req.body;
+    if (!conductorId || latitud === undefined || longitud === undefined)
+      return res.status(400).json({ error: "conductorId, latitud y longitud son requeridos" });
 
-    const lectura = new Ubicacion({ conductorId, location });
+    const lectura = new Ubicacion({ conductorId, latitud, longitud });
     await lectura.save();
     res.status(201).json({ message: "Ubicación guardada", data: lectura });
   } catch (err) {
@@ -175,6 +176,33 @@ app.get("/ubicacion/:conductorId/latest", async (req, res) => {
     const doc = await Ubicacion.findOne({ conductorId: req.params.conductorId }).sort({ createdAt: -1 });
     if (!doc) return res.status(404).json({ error: "Sin lecturas de ubicación" });
     res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- Última lectura combinada --------------------
+app.get("/lectura/:conductorId/latest", async (req, res) => {
+  try {
+    const conductorId = req.params.conductorId;
+
+    const [ritmo, brujula, ubicacion] = await Promise.all([
+      Ritmo.findOne({ conductorId }).sort({ createdAt: -1 }),
+      Brujula.findOne({ conductorId }).sort({ createdAt: -1 }),
+      Ubicacion.findOne({ conductorId }).sort({ createdAt: -1 }),
+    ]);
+
+    if (!ritmo && !brujula && !ubicacion)
+      return res.status(404).json({ error: "No hay lecturas para este conductor" });
+
+    res.json({
+      conductorId,
+      ritmo: ritmo ? { bpm: ritmo.bpm, fecha: ritmo.fecha } : null,
+      brujula: brujula ? { compass: brujula.compass, fecha: brujula.fecha } : null,
+      ubicacion: ubicacion
+        ? { latitud: ubicacion.latitud, longitud: ubicacion.longitud, fecha: ubicacion.fecha }
+        : null,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
